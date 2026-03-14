@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.quicknotes"
+    namespace = "com.notebee"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.quicknotes"
+        applicationId = "com.notebee"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -19,10 +19,10 @@ android {
 
     sourceSets {
         getByName("main") {
-            java.srcDirs("src/main/kotlin", "src/additionalSourceDirectory/kotlin")
+            java.srcDirs("src/main/java", "src/main/kotlin", "src/additionalSourceDirectory/kotlin")
         }
         getByName("debug") {
-            java.srcDirs("src/debug/kotlin")
+            java.srcDirs("src/main/java", "src/debug/kotlin")
         }
     }
 

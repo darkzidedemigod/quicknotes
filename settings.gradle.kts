@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "QuickNotes"
+rootProject.name = "NoteBee"
 include(":app")
