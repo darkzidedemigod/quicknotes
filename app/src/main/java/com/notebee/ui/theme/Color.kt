@@ -13,3 +13,5 @@ val Pink40 = Color(0xFF7D5260)
 
 // Quick Notes accent
 val PinYellow = Color(0xFFFFB300)
+val NoteBeePrimary = Color(0xFFFCD135) // This matches your #FCD135 in colors.xml
+val NoteBeeBlack = Color(0xFF000000)

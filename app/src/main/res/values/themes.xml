@@ -6,4 +6,11 @@
         <item name="android:windowLightStatusBar">true</item>
         <item name="android:colorPrimary">@color/primary</item>
     </style>
+
+    <!-- Splash Screen Theme -->
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/primary</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_round</item>
+        <item name="postSplashScreenTheme">@style/Theme.QuickNotes</item>
+    </style>
 </resources>
