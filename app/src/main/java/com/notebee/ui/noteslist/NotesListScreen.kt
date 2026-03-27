@@ -38,6 +38,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -83,58 +84,68 @@ fun NotesListScreen(
             .fillMaxSize()
             .padding(paddingValues)
     ) {
-        // Search bar at top
-        TextField(
-            value = state.searchQuery,
-            onValueChange = onSearchQueryChange,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            placeholder = { Text("Search notes...") },
-            leadingIcon = {
-                Icon(Icons.Default.Search, contentDescription = null)
-            },
-            singleLine = true,
-            shape = RoundedCornerShape(12.dp),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
-                focusedIndicatorColor = MaterialTheme.colorScheme.primary,
-                unfocusedIndicatorColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-            )
-        )
-        if (state.notes.isEmpty()) {
-            // Empty state
-            EmptyState(
+
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Search bar at top
+            TextField(
+                value = state.searchQuery,
+                onValueChange = onSearchQueryChange,
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(top = 72.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                placeholder = { Text("Search notes...") },
+                leadingIcon = {
+                    Icon(Icons.Default.Search, contentDescription = null)
+                },
+                singleLine = true,
+                shape = RoundedCornerShape(12.dp),
+                colors = TextFieldDefaults.colors(
+                    focusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    focusedIndicatorColor = MaterialTheme.colorScheme.primary,
+                    unfocusedIndicatorColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                )
             )
-        }else {
-            LazyColumn(
-                contentPadding = PaddingValues(
-                    start = 16.dp,
-                    end = 16.dp,
-                    top = 72.dp,
-                    bottom = 88.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                itemsIndexed(
-                    state.notes,
-                    key = { _, note -> note.id }
-                ) { index, note ->
-                    AnimatedVisibility(
-                        visible = true,
-                        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
-                        exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 4 })
-                    ) {
-                        NoteCard(
-                            note = note,
-                            onClick = { onNoteClick(note.id) },
-                            onTogglePin = { onTogglePin(note) },
-                            onDelete = { onDeleteNote(note) }
-                        )
+
+            if (state.notes.isEmpty()) {
+                // Empty state
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                ) {
+                    EmptyState(
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(bottom = 150.dp)
+                    )
+                }
+            } else {
+                LazyColumn(
+                    contentPadding = PaddingValues(
+                        start = 16.dp,
+                        end = 16.dp,
+                        top = 16.dp,
+                        bottom = 88.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    itemsIndexed(
+                        state.notes,
+                        key = { _, note -> note.id }
+                    ) { index, note ->
+                        AnimatedVisibility(
+                            visible = true,
+                            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
+                            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 4 })
+                        ) {
+                            NoteCard(
+                                note = note,
+                                onClick = { onNoteClick(note.id) },
+                                onTogglePin = { onTogglePin(note) },
+                                onDelete = { onDeleteNote(note) }
+                            )
+                        }
                     }
                 }
             }
@@ -235,7 +246,8 @@ fun EmptyState(modifier: Modifier = Modifier) {
         Text(
             text = "No notes yet\nTap + to create one",
             style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -280,7 +292,7 @@ fun NotesListScreenPreview() {
         )
         NotesListScreen(
             state = NotesListUiState(
-                notes = sampleNotes,
+                notes = emptyList(),
                 searchQuery = ""
             ),
             onSearchQueryChange = {},
