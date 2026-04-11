@@ -1,33 +1,53 @@
 package com.notebee.ui.addeditnote
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.notebee.ui.theme.PinYellow
+import kotlinx.coroutines.launch
 
 /**
  * Screen for creating a new note or editing an existing one.
@@ -42,7 +62,10 @@ fun AddEditNoteScreen(
     onTogglePinned: () -> Unit,
     onSave: () -> Unit,
     onBack: () -> Unit,
-    onDelete: (() -> Unit)?
+    onDelete: (() -> Unit)?,
+    onShowTagSelector: () -> Unit,
+    onToggleTagSelection: (com.notebee.data.local.entity.Tag) -> Unit,
+    onAddNewTag: (String) -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -114,6 +137,71 @@ fun AddEditNoteScreen(
                 minLines = 8,
                 shape = RoundedCornerShape(12.dp)
             )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // Tags section
+            Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Tags",
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                    Button(
+                        onClick = onShowTagSelector,
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
+                        Text("Add Tag")
+                    }
+                }
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                // Selected tags row
+                if (state.selectedTags.isNotEmpty()) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(state.selectedTags) { tag ->
+                            InputChip(
+                                selected = true,
+                                onClick = { onToggleTagSelection(tag) },
+                                label = { Text(tag.name) },
+                                trailingIcon = {
+                                    Icon(
+                                        Icons.Default.Delete,
+                                        contentDescription = "Remove tag",
+                                        modifier = Modifier.padding(end = 4.dp)
+                                    )
+                                }
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "No tags added. Tap 'Add Tag' to organize your note.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Tag selector modal
+            if (state.showTagSelector) {
+                TagSelectorBottomSheet(
+                    isVisible = state.showTagSelector,
+                    allTags = state.allTags,
+                    selectedTags = state.selectedTags,
+                    onDismiss = { onShowTagSelector() },
+                    onTagToggle = { onToggleTagSelection(it) },
+                    onAddNewTag = { onAddNewTag(it) }
+                )
+            }
         }
     }
 }

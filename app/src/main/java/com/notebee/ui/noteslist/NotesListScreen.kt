@@ -12,21 +12,27 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -43,6 +49,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.notebee.data.local.entity.Note
+import com.notebee.data.local.entity.NoteWithTags
 import com.notebee.ui.theme.PinYellow
 import com.notebee.ui.theme.QuickNotesTheme
 import java.text.SimpleDateFormat
@@ -59,9 +66,10 @@ fun NotesListScreen(
     state: NotesListUiState,
     onSearchQueryChange: (String) -> Unit,
     onNoteClick: (Long) -> Unit,
-    onDeleteNote: (Note) -> Unit,
-    onTogglePin: (Note) -> Unit,
-    onAddNote: () -> Unit
+    onDeleteNote: (NoteWithTags) -> Unit,
+    onTogglePin: (NoteWithTags) -> Unit,
+    onAddNote: () -> Unit,
+    onTagFilterSelected: (String?) -> Unit
 ) {
     Scaffold(topBar = {
         TopAppBar(
@@ -107,7 +115,14 @@ fun NotesListScreen(
                 )
             )
 
-            if (state.notes.isEmpty()) {
+            // Tag chips filter
+            TagFilterRow(
+                allTags = state.allTags,
+                selectedTag = state.selectedTag,
+                onTagSelected = onTagFilterSelected
+            )
+
+            if (state.notesWithTags.isEmpty()) {
                 // Empty state
                 Box(
                     modifier = Modifier
@@ -131,19 +146,19 @@ fun NotesListScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     itemsIndexed(
-                        state.notes,
-                        key = { _, note -> note.id }
-                    ) { index, note ->
+                        state.notesWithTags,
+                        key = { _, noteWithTags -> noteWithTags.note.id }
+                    ) { index, noteWithTags ->
                         AnimatedVisibility(
                             visible = true,
                             enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
                             exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 4 })
                         ) {
                             NoteCard(
-                                note = note,
-                                onClick = { onNoteClick(note.id) },
-                                onTogglePin = { onTogglePin(note) },
-                                onDelete = { onDeleteNote(note) }
+                                noteWithTags = noteWithTags,
+                                onClick = { onNoteClick(noteWithTags.note.id) },
+                                onTogglePin = { onTogglePin(noteWithTags) },
+                                onDelete = { onDeleteNote(noteWithTags) }
                             )
                         }
                     }
@@ -156,11 +171,13 @@ fun NotesListScreen(
 
 @Composable
 fun NoteCard(
-    note: Note,
+    noteWithTags: NoteWithTags,
     onClick: () -> Unit,
     onTogglePin: () -> Unit,
     onDelete: () -> Unit
 ) {
+    val note = noteWithTags.note
+    val tags = noteWithTags.tags
     Card(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -207,6 +224,34 @@ fun NoteCard(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                
+                // Tags row
+                if (tags.isNotEmpty()) {
+                    LazyRow(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        items(tags.take(3)) { tag ->
+                            InputChip(
+                                selected = false,
+                                onClick = { },
+                                label = { Text(tag.name, style = MaterialTheme.typography.labelSmall) },
+                                modifier = Modifier.height(24.dp)
+                            )
+                        }
+                        if (tags.size > 3) {
+                            item {
+                                Text(
+                                    text = "+${tags.size - 3}",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(horizontal = 4.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+                
                 Text(
                     text = formatTimestamp(note.timestamp),
                     style = MaterialTheme.typography.labelSmall,
@@ -292,14 +337,17 @@ fun NotesListScreenPreview() {
         )
         NotesListScreen(
             state = NotesListUiState(
-                notes = emptyList(),
-                searchQuery = ""
+                notesWithTags = emptyList(),
+                allTags = emptyList(),
+                searchQuery = "",
+                selectedTag = null
             ),
             onSearchQueryChange = {},
             onNoteClick = {},
             onDeleteNote = {},
             onTogglePin = {},
-            onAddNote = {}
+            onAddNote = {},
+            onTagFilterSelected = {}
         )
     }
 }
@@ -309,12 +357,18 @@ fun NotesListScreenPreview() {
 fun NotesListScreenEmptyPreview() {
     QuickNotesTheme {
         NotesListScreen(
-            state = NotesListUiState(notes = emptyList()),
+            state = NotesListUiState(
+                notesWithTags = emptyList(),
+                allTags = emptyList(),
+                searchQuery = "",
+                selectedTag = null
+            ),
             onSearchQueryChange = {},
             onNoteClick = {},
             onDeleteNote = {},
             onTogglePin = {},
-            onAddNote = {}
+            onAddNote = {},
+            onTagFilterSelected = {}
         )
     }
 }

@@ -6,7 +6,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Transaction
 import com.notebee.data.local.entity.Note
+import com.notebee.data.local.entity.NoteWithTags
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -49,4 +51,19 @@ interface NoteDao {
 
     @Query("UPDATE notes SET isPinned = :pinned WHERE id = :id")
     suspend fun setPinned(id: Long, pinned: Boolean)
+
+    /**
+     * Returns all notes with their associated tags.
+     * Uses @Transaction to ensure the query runs in a single transaction.
+     */
+    @Transaction
+    @Query("SELECT * FROM notes ORDER BY isPinned DESC, timestamp DESC")
+    fun getNotesWithTags(): Flow<List<NoteWithTags>>
+
+    /**
+     * Returns a single note with its associated tags by ID.
+     */
+    @Transaction
+    @Query("SELECT * FROM notes WHERE id = :id")
+    suspend fun getNoteWithTagsById(id: Long): NoteWithTags?
 }

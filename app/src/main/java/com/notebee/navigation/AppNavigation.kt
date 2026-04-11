@@ -49,7 +49,8 @@ fun AppNavigation(
                 onNoteClick = { id -> navController.navigate(Routes.addEditNote(id)) },
                 onDeleteNote = viewModel::deleteNote,
                 onTogglePin = viewModel::togglePin,
-                onAddNote = { navController.navigate(Routes.ADD_EDIT_NOTE) }
+                onAddNote = { navController.navigate(Routes.ADD_EDIT_NOTE) },
+                onTagFilterSelected = viewModel::setTagFilter
             )
         }
 
@@ -63,7 +64,10 @@ fun AppNavigation(
                 onTogglePinned = viewModel::togglePinned,
                 onSave = { viewModel.saveNote { navController.popBackStack() } },
                 onBack = { navController.popBackStack() },
-                onDelete = null
+                onDelete = null,
+                onShowTagSelector = viewModel::showTagSelector,
+                onToggleTagSelection = viewModel::toggleTagSelection,
+                onAddNewTag = viewModel::addNewTag
             )
         }
 
@@ -84,7 +88,10 @@ fun AppNavigation(
                 onBack = { navController.popBackStack() },
                 onDelete = {
                     viewModel.deleteNote { navController.popBackStack() }
-                }
+                },
+                onShowTagSelector = viewModel::showTagSelector,
+                onToggleTagSelection = viewModel::toggleTagSelection,
+                onAddNewTag = viewModel::addNewTag
             )
         }
     }

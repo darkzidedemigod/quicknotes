@@ -4,11 +4,14 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.notebee.data.local.entity.Note
+import com.notebee.data.local.entity.NoteWithTags
+import com.notebee.data.local.entity.Tag
 import com.notebee.data.repository.NoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -21,7 +24,10 @@ data class AddEditNoteUiState(
     val content: String = "",
     val isPinned: Boolean = false,
     val noteId: Long? = null,
-    val isSaving: Boolean = false
+    val isSaving: Boolean = false,
+    val selectedTags: List<Tag> = emptyList(),
+    val allTags: List<Tag> = emptyList(),
+    val showTagSelector: Boolean = false
 )
 
 /**
@@ -40,14 +46,23 @@ class AddEditNoteViewModel @Inject constructor(
     val state: StateFlow<AddEditNoteUiState> = _state.asStateFlow()
 
     init {
+        // Load all tags
+        viewModelScope.launch {
+            repository.getAllTags().collect { allTags ->
+                _state.update { it.copy(allTags = allTags) }
+            }
+        }
+
+        // Load existing note if editing
         noteId?.let { id ->
             viewModelScope.launch {
-                repository.getNoteById(id)?.let { note ->
+                repository.getNoteWithTagsById(id)?.let { noteWithTags ->
                     _state.update {
                         it.copy(
-                            title = note.title,
-                            content = note.content,
-                            isPinned = note.isPinned
+                            title = noteWithTags.note.title,
+                            content = noteWithTags.note.content,
+                            isPinned = noteWithTags.note.isPinned,
+                            selectedTags = noteWithTags.tags
                         )
                     }
                 }
@@ -67,6 +82,44 @@ class AddEditNoteViewModel @Inject constructor(
         _state.update { it.copy(isPinned = !it.isPinned) }
     }
 
+    fun showTagSelector() {
+        _state.update { it.copy(showTagSelector = true) }
+    }
+
+    fun hideTagSelector() {
+        _state.update { it.copy(showTagSelector = false) }
+    }
+
+    fun toggleTagSelection(tag: Tag) {
+        _state.update { currentState ->
+            val isSelected = currentState.selectedTags.any { it.id == tag.id }
+            val newSelectedTags = if (isSelected) {
+                currentState.selectedTags.filter { it.id != tag.id }
+            } else {
+                currentState.selectedTags + tag
+            }
+            currentState.copy(selectedTags = newSelectedTags)
+        }
+    }
+
+    fun addNewTag(tagName: String) {
+        if (tagName.isBlank()) return
+        
+        viewModelScope.launch {
+            val newTag = repository.getOrCreateTag(tagName.trim())
+            _state.update { currentState ->
+                if (!currentState.selectedTags.any { it.id == newTag.id }) {
+                    currentState.copy(
+                        selectedTags = currentState.selectedTags + newTag,
+                        allTags = currentState.allTags + newTag
+                    )
+                } else {
+                    currentState
+                }
+            }
+        }
+    }
+
     /**
      * Deletes the current note (only when editing). Call onDeleted after delete.
      */
@@ -80,7 +133,7 @@ class AddEditNoteViewModel @Inject constructor(
 
     /**
      * Saves the note: insert if new, update if editing.
-     * Uses current timestamp on save.
+     * Uses current timestamp on save and updates tags.
      */
     fun saveNote(onSaved: () -> Unit) {
         val current = _state.value
@@ -98,11 +151,21 @@ class AddEditNoteViewModel @Inject constructor(
                 timestamp = timestamp,
                 isPinned = current.isPinned
             )
+            
             if (current.noteId != null) {
                 repository.updateNote(note)
             } else {
-                repository.insertNote(note)
+                val insertedId = repository.insertNote(note)
+                // Update noteId for tag assignment
+                repository.updateNoteTags(insertedId, current.selectedTags.map { it.name })
+                _state.update { it.copy(noteId = insertedId) }
+                _state.update { it.copy(isSaving = false) }
+                onSaved()
+                return@launch
             }
+            
+            // Update tags for existing note
+            repository.updateNoteTags(note.id, current.selectedTags.map { it.name })
             _state.update { it.copy(isSaving = false) }
             onSaved()
         }
