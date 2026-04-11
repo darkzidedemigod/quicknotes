@@ -1,7 +1,6 @@
 package com.notebee.ui.addeditnote
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -21,33 +20,25 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Save
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.notebee.data.local.entity.Tag
 import com.notebee.ui.theme.PinYellow
-import kotlinx.coroutines.launch
+import com.notebee.ui.theme.QuickNotesTheme
 
 /**
  * Screen for creating a new note or editing an existing one.
@@ -64,6 +55,7 @@ fun AddEditNoteScreen(
     onBack: () -> Unit,
     onDelete: (() -> Unit)?,
     onShowTagSelector: () -> Unit,
+    onHideTagSelector: () -> Unit,
     onToggleTagSelection: (com.notebee.data.local.entity.Tag) -> Unit,
     onAddNewTag: (String) -> Unit
 ) {
@@ -197,11 +189,65 @@ fun AddEditNoteScreen(
                     isVisible = state.showTagSelector,
                     allTags = state.allTags,
                     selectedTags = state.selectedTags,
-                    onDismiss = { onShowTagSelector() },
+                    onDismiss = onHideTagSelector,
                     onTagToggle = { onToggleTagSelection(it) },
                     onAddNewTag = { onAddNewTag(it) }
                 )
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun AddNotePreview() {
+    QuickNotesTheme {
+        AddEditNoteScreen(
+            state = AddEditNoteUiState(
+                title = "",
+                content = "",
+                isPinned = false,
+                noteId = null
+            ),
+            onTitleChange = {},
+            onContentChange = {},
+            onTogglePinned = {},
+            onSave = {},
+            onBack = {},
+            onDelete = null,
+            onShowTagSelector = {},
+            onHideTagSelector = {},
+            onToggleTagSelection = {},
+            onAddNewTag = {}
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun EditNotePreview() {
+    QuickNotesTheme {
+        AddEditNoteScreen(
+            state = AddEditNoteUiState(
+                title = "Meeting Notes",
+                content = "Discuss the new project requirements and timelines.",
+                isPinned = true,
+                noteId = 1L,
+                selectedTags = listOf(
+                    Tag(1, "Work"),
+                    Tag(2, "Urgent")
+                )
+            ),
+            onTitleChange = {},
+            onContentChange = {},
+            onTogglePinned = {},
+            onSave = {},
+            onBack = {},
+            onDelete = {},
+            onShowTagSelector = {},
+            onHideTagSelector = {},
+            onToggleTagSelection = {},
+            onAddNewTag = {}
+        )
     }
 }

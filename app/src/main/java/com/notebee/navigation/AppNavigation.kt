@@ -66,6 +66,7 @@ fun AppNavigation(
                 onBack = { navController.popBackStack() },
                 onDelete = null,
                 onShowTagSelector = viewModel::showTagSelector,
+                onHideTagSelector = viewModel::hideTagSelector,
                 onToggleTagSelection = viewModel::toggleTagSelection,
                 onAddNewTag = viewModel::addNewTag
             )
@@ -90,6 +91,7 @@ fun AppNavigation(
                     viewModel.deleteNote { navController.popBackStack() }
                 },
                 onShowTagSelector = viewModel::showTagSelector,
+                onHideTagSelector = viewModel::hideTagSelector,
                 onToggleTagSelection = viewModel::toggleTagSelection,
                 onAddNewTag = viewModel::addNewTag
             )

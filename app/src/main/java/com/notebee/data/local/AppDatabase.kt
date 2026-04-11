@@ -2,8 +2,6 @@ package com.notebee.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import androidx.room.migration.Migration
-import androidx.sqlite.db.SupportSQLiteDatabase
 import com.notebee.data.local.dao.NoteDao
 import com.notebee.data.local.dao.TagDao
 import com.notebee.data.local.entity.Note
@@ -18,8 +16,7 @@ import com.notebee.data.local.entity.NoteTagCrossRef
     entities = [Note::class, Tag::class, NoteTagCrossRef::class], 
     version = 2, 
     exportSchema = false,
-    autoMigrations = [],
-    migrations = [MIGRATION_1_2]
+    autoMigrations = []
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun noteDao(): NoteDao
