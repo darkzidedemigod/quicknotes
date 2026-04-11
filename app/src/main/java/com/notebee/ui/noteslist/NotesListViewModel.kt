@@ -2,18 +2,17 @@ package com.notebee.ui.noteslist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.notebee.data.local.entity.Note
 import com.notebee.data.local.entity.NoteWithTags
 import com.notebee.data.local.entity.Tag
 import com.notebee.data.repository.NoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -32,7 +31,6 @@ data class NotesListUiState(
 /**
  * ViewModel for the notes list screen.
  * Combines search query and tag filter with repository Flow for real-time filtering.
- * Sorting (pinned first, then by timestamp) is done in the DAO.
  */
 @HiltViewModel
 class NotesListViewModel @Inject constructor(
@@ -40,61 +38,44 @@ class NotesListViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val _searchQuery = MutableStateFlow("")
-    private val _selectedTag = MutableStateFlow<String?>(null)
+    val searchQuery = _searchQuery.asStateFlow()
 
-    /** Notes flow from DB (pinned first, then by latest timestamp). */
+    private val _selectedTag = MutableStateFlow<String?>(null)
+    val selectedTag = _selectedTag.asStateFlow()
+
+    @OptIn(ExperimentalCoroutinesApi::class)
     private val notesWithTagsFlow = combine(
-        _searchQuery.asStateFlow(),
-        _selectedTag.asStateFlow(),
-        repository.getAllTags()
-    ) { query, selectedTag, allTags ->
-        when {
-            selectedTag != null -> {
-                // Filter by selected tag
-                repository.getNotesByTag(selectedTag)
-            }
-            query.isNotBlank() -> {
-                // Search by query (convert to NoteWithTags)
-                repository.searchNotes(query).map { notes ->
-                    notes.map { note ->
-                        // Convert Note to NoteWithTags with empty tags for search results
-                        NoteWithTags(note = note, tags = emptyList())
-                    }
-                }
-            }
-            else -> {
-                // All notes
-                repository.getNotesWithTags()
+        _searchQuery,
+        _selectedTag
+    ) { query, tag -> query to tag }
+        .flatMapLatest { (query, tag) ->
+            when {
+                tag != null -> repository.getNotesByTag(tag)
+                query.isNotBlank() -> repository.searchNotesWithTags(query)
+                else -> repository.getNotesWithTags()
             }
         }
-    }.flatMapLatest { it }
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
-        )
 
     val state: StateFlow<NotesListUiState> = combine(
-        _searchQuery.asStateFlow(),
-        _selectedTag.asStateFlow(),
+        _searchQuery,
+        _selectedTag,
         notesWithTagsFlow,
         repository.getAllTags()
-    ) { searchQuery, selectedTag, notesWithTags, allTags ->
+    ) { query, tag, notes, tags ->
         NotesListUiState(
-            notesWithTags = notesWithTags,
-            allTags = allTags,
-            searchQuery = searchQuery,
-            selectedTag = selectedTag
+            notesWithTags = notes,
+            allTags = tags,
+            searchQuery = query,
+            selectedTag = tag
         )
     }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = NotesListUiState()
+        initialValue = NotesListUiState(isLoading = true)
     )
 
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
-        // Clear tag filter when searching
         if (query.isNotBlank()) {
             _selectedTag.value = null
         }
@@ -102,14 +83,9 @@ class NotesListViewModel @Inject constructor(
 
     fun setTagFilter(tagName: String?) {
         _selectedTag.value = tagName
-        // Clear search when filtering by tag
         if (tagName != null) {
             _searchQuery.value = ""
         }
-    }
-
-    fun clearTagFilter() {
-        _selectedTag.value = null
     }
 
     fun deleteNote(noteWithTags: NoteWithTags) {

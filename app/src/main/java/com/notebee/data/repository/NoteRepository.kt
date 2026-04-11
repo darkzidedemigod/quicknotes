@@ -7,9 +7,6 @@ import com.notebee.data.local.entity.Tag
 import com.notebee.data.local.entity.NoteTagCrossRef
 import com.notebee.data.local.entity.NoteWithTags
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -37,6 +34,11 @@ class NoteRepository @Inject constructor(
      * Stream of notes filtered by search query (title or content).
      */
     fun searchNotes(query: String): Flow<List<Note>> = noteDao.searchNotes(query)
+
+    /**
+     * Stream of notes with tags filtered by search query.
+     */
+    fun searchNotesWithTags(query: String): Flow<List<NoteWithTags>> = noteDao.searchNotesWithTags(query)
 
     /**
      * Stream of notes filtered by a specific tag name.
@@ -75,8 +77,10 @@ class NoteRepository @Inject constructor(
      * Creates a new tag if it doesn't exist, or returns existing tag.
      */
     suspend fun getOrCreateTag(name: String): Tag {
-        return tagDao.getTagByName(name) ?: Tag(name = name.trim()).also {
-            tagDao.insertTag(it)
+        val trimmedName = name.trim()
+        return tagDao.getTagByName(trimmedName) ?: Tag(name = trimmedName).let {
+            val id = tagDao.insertTag(it)
+            it.copy(id = id)
         }
     }
 
@@ -102,9 +106,9 @@ class NoteRepository @Inject constructor(
         tagDao.deleteNoteTagReferences(noteId)
         
         // Add new tag associations
-        tagNames.forEach { tagName ->
+        tagNames.distinct().forEach { tagName ->
             if (tagName.isNotBlank()) {
-                val tag = getOrCreateTag(tagName.trim())
+                val tag = getOrCreateTag(tagName)
                 assignTagToNote(noteId, tag.id)
             }
         }
@@ -128,4 +132,18 @@ class NoteRepository @Inject constructor(
      * Returns the count of notes associated with a specific tag.
      */
     suspend fun getNoteCountForTag(tagId: Long): Int = tagDao.getNoteCountForTag(tagId)
+
+    /**
+     * Saves or updates a note and its tags atomically.
+     */
+    suspend fun saveNoteWithTags(note: Note, tagNames: List<String>): Long {
+        val noteId = if (note.id == 0L) {
+            noteDao.insertNote(note)
+        } else {
+            noteDao.updateNote(note)
+            note.id
+        }
+        updateNoteTags(noteId, tagNames)
+        return noteId
+    }
 }

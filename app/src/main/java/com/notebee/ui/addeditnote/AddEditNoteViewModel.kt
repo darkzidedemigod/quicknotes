@@ -4,14 +4,13 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.notebee.data.local.entity.Note
-import com.notebee.data.local.entity.NoteWithTags
 import com.notebee.data.local.entity.Tag
+import com.notebee.data.repository.AiRepository
 import com.notebee.data.repository.NoteRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -27,16 +26,17 @@ data class AddEditNoteUiState(
     val isSaving: Boolean = false,
     val selectedTags: List<Tag> = emptyList(),
     val allTags: List<Tag> = emptyList(),
-    val showTagSelector: Boolean = false
+    val showTagSelector: Boolean = false,
+    val isAiLoading: Boolean = false
 )
 
 /**
  * ViewModel for adding a new note or editing an existing one.
- * noteId from SavedStateHandle: when null, we're adding; otherwise editing.
  */
 @HiltViewModel
 class AddEditNoteViewModel @Inject constructor(
     private val repository: NoteRepository,
+    private val aiRepository: AiRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -46,6 +46,10 @@ class AddEditNoteViewModel @Inject constructor(
     val state: StateFlow<AddEditNoteUiState> = _state.asStateFlow()
 
     init {
+        loadInitialData()
+    }
+
+    private fun loadInitialData() {
         // Load all tags
         viewModelScope.launch {
             repository.getAllTags().collect { allTags ->
@@ -103,71 +107,89 @@ class AddEditNoteViewModel @Inject constructor(
     }
 
     fun addNewTag(tagName: String) {
-        if (tagName.isBlank()) return
+        val trimmed = tagName.trim()
+        if (trimmed.isBlank()) return
         
         viewModelScope.launch {
-            val newTag = repository.getOrCreateTag(tagName.trim())
+            val tag = repository.getOrCreateTag(trimmed)
             _state.update { currentState ->
-                if (!currentState.selectedTags.any { it.id == newTag.id }) {
-                    currentState.copy(
-                        selectedTags = currentState.selectedTags + newTag,
-                        allTags = currentState.allTags + newTag
-                    )
-                } else {
-                    currentState
-                }
+                if (currentState.selectedTags.none { it.id == tag.id }) {
+                    currentState.copy(selectedTags = currentState.selectedTags + tag)
+                } else currentState
             }
         }
     }
 
-    /**
-     * Deletes the current note (only when editing). Call onDeleted after delete.
-     */
+    fun suggestTags() {
+        val currentTitle = _state.value.title
+        val currentContent = _state.value.content
+        if (currentContent.isBlank()) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isAiLoading = true) }
+            try {
+                val suggestedTagNames = aiRepository.suggestTags(currentTitle, currentContent)
+                val newTags = suggestedTagNames.map { repository.getOrCreateTag(it) }
+                
+                _state.update { currentState ->
+                    val updatedSelected = (currentState.selectedTags + newTags).distinctBy { it.id }
+                    currentState.copy(selectedTags = updatedSelected)
+                }
+            } finally {
+                _state.update { it.copy(isAiLoading = false) }
+            }
+        }
+    }
+
+    fun generateTitle() {
+        val currentContent = _state.value.content
+        if (currentContent.isBlank()) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isAiLoading = true) }
+            try {
+                val generatedTitle = aiRepository.generateTitle(currentContent)
+                if (!generatedTitle.isNullOrBlank()) {
+                    _state.update { it.copy(title = generatedTitle) }
+                }
+            } finally {
+                _state.update { it.copy(isAiLoading = false) }
+            }
+        }
+    }
+
     fun deleteNote(onDeleted: () -> Unit) {
-        val id = _state.value.noteId ?: return
+        val id = noteId ?: return
         viewModelScope.launch {
             repository.getNoteById(id)?.let { repository.deleteNote(it) }
             onDeleted()
         }
     }
 
-    /**
-     * Saves the note: insert if new, update if editing.
-     * Uses current timestamp on save and updates tags.
-     */
     fun saveNote(onSaved: () -> Unit) {
         val current = _state.value
         if (current.title.isBlank() && current.content.isBlank()) {
             onSaved()
             return
         }
+        
         viewModelScope.launch {
             _state.update { it.copy(isSaving = true) }
-            val timestamp = System.currentTimeMillis()
-            val note = Note(
-                id = current.noteId ?: 0,
-                title = current.title.ifBlank { "Untitled" },
-                content = current.content,
-                timestamp = timestamp,
-                isPinned = current.isPinned
-            )
-            
-            if (current.noteId != null) {
-                repository.updateNote(note)
-            } else {
-                val insertedId = repository.insertNote(note)
-                // Update noteId for tag assignment
-                repository.updateNoteTags(insertedId, current.selectedTags.map { it.name })
-                _state.update { it.copy(noteId = insertedId) }
-                _state.update { it.copy(isSaving = false) }
+            try {
+                val note = Note(
+                    id = current.noteId ?: 0L,
+                    title = current.title.ifBlank { "Untitled" },
+                    content = current.content,
+                    timestamp = System.currentTimeMillis(),
+                    isPinned = current.isPinned
+                )
+                
+                val savedId = repository.saveNoteWithTags(note, current.selectedTags.map { it.name })
+                _state.update { it.copy(noteId = savedId) }
                 onSaved()
-                return@launch
+            } finally {
+                _state.update { it.copy(isSaving = false) }
             }
-            
-            // Update tags for existing note
-            repository.updateNoteTags(note.id, current.selectedTags.map { it.name })
-            _state.update { it.copy(isSaving = false) }
-            onSaved()
         }
     }
 }

@@ -5,9 +5,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,10 +26,9 @@ fun TagFilterRow(
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
+            .padding(horizontal = 16.dp, vertical = 4.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // "All" chip to clear filter
         item {
             FilterChip(
                 selected = selectedTag == null,
@@ -45,8 +42,7 @@ fun TagFilterRow(
             )
         }
         
-        // Tag chips
-        items(allTags) { tag ->
+        items(allTags, key = { it.id }) { tag ->
             FilterChip(
                 selected = selectedTag == tag.name,
                 onClick = { onTagSelected(tag.name) },

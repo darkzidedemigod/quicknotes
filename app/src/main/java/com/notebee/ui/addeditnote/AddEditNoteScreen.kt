@@ -1,5 +1,6 @@
 package com.notebee.ui.addeditnote
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -17,14 +19,18 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -34,6 +40,7 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.notebee.data.local.entity.Tag
@@ -56,8 +63,10 @@ fun AddEditNoteScreen(
     onDelete: (() -> Unit)?,
     onShowTagSelector: () -> Unit,
     onHideTagSelector: () -> Unit,
-    onToggleTagSelection: (com.notebee.data.local.entity.Tag) -> Unit,
-    onAddNewTag: (String) -> Unit
+    onToggleTagSelection: (Tag) -> Unit,
+    onAddNewTag: (String) -> Unit,
+    onSuggestTags: () -> Unit,
+    onGenerateTitle: () -> Unit
 ) {
     Scaffold(
         topBar = {
@@ -108,15 +117,41 @@ fun AddEditNoteScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
-            OutlinedTextField(
-                value = state.title,
-                onValueChange = onTitleChange,
+            AnimatedVisibility(visible = state.isAiLoading) {
+                LinearProgressIndicator(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    color = MaterialTheme.colorScheme.tertiary
+                )
+            }
+
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Title") },
-                placeholder = { Text("Note title") },
-                singleLine = true,
-                shape = RoundedCornerShape(12.dp)
-            )
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = state.title,
+                    onValueChange = onTitleChange,
+                    modifier = Modifier.weight(1f),
+                    label = { Text("Title") },
+                    placeholder = { Text("Note title") },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp)
+                )
+                
+                IconButton(
+                    onClick = onGenerateTitle,
+                    enabled = state.content.isNotBlank() && !state.isAiLoading
+                ) {
+                    Icon(
+                        Icons.Default.AutoAwesome,
+                        contentDescription = "Generate Title",
+                        tint = if (state.content.isNotBlank()) MaterialTheme.colorScheme.tertiary else Color.Gray
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             OutlinedTextField(
                 value = state.content,
@@ -143,12 +178,34 @@ fun AddEditNoteScreen(
                         text = "Tags",
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Button(
-                        onClick = onShowTagSelector,
-                        modifier = Modifier.height(32.dp)
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.padding(end = 4.dp))
-                        Text("Add Tag")
+                    
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Button(
+                            onClick = onSuggestTags,
+                            enabled = state.content.isNotBlank() && !state.isAiLoading,
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                            ),
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(Modifier.padding(horizontal = 2.dp))
+                            Text("Suggest", style = MaterialTheme.typography.labelMedium)
+                        }
+
+                        Button(
+                            onClick = onShowTagSelector,
+                            modifier = Modifier.height(32.dp)
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.padding(horizontal = 2.dp))
+                            Text("Add", style = MaterialTheme.typography.labelMedium)
+                        }
                     }
                 }
                 
@@ -168,7 +225,7 @@ fun AddEditNoteScreen(
                                     Icon(
                                         Icons.Default.Delete,
                                         contentDescription = "Remove tag",
-                                        modifier = Modifier.padding(end = 4.dp)
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
                             )
@@ -176,7 +233,7 @@ fun AddEditNoteScreen(
                     }
                 } else {
                     Text(
-                        text = "No tags added. Tap 'Add Tag' to organize your note.",
+                        text = "No tags added. Tap 'Add' to organize your note.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -218,36 +275,9 @@ fun AddNotePreview() {
             onShowTagSelector = {},
             onHideTagSelector = {},
             onToggleTagSelection = {},
-            onAddNewTag = {}
-        )
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun EditNotePreview() {
-    QuickNotesTheme {
-        AddEditNoteScreen(
-            state = AddEditNoteUiState(
-                title = "Meeting Notes",
-                content = "Discuss the new project requirements and timelines.",
-                isPinned = true,
-                noteId = 1L,
-                selectedTags = listOf(
-                    Tag(1, "Work"),
-                    Tag(2, "Urgent")
-                )
-            ),
-            onTitleChange = {},
-            onContentChange = {},
-            onTogglePinned = {},
-            onSave = {},
-            onBack = {},
-            onDelete = {},
-            onShowTagSelector = {},
-            onHideTagSelector = {},
-            onToggleTagSelection = {},
-            onAddNewTag = {}
+            onAddNewTag = {},
+            onSuggestTags = {},
+            onGenerateTitle = {}
         )
     }
 }

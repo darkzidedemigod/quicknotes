@@ -68,7 +68,9 @@ fun AppNavigation(
                 onShowTagSelector = viewModel::showTagSelector,
                 onHideTagSelector = viewModel::hideTagSelector,
                 onToggleTagSelection = viewModel::toggleTagSelection,
-                onAddNewTag = viewModel::addNewTag
+                onAddNewTag = viewModel::addNewTag,
+                onSuggestTags = viewModel::suggestTags,
+                onGenerateTitle = viewModel::generateTitle
             )
         }
 
@@ -93,7 +95,9 @@ fun AppNavigation(
                 onShowTagSelector = viewModel::showTagSelector,
                 onHideTagSelector = viewModel::hideTagSelector,
                 onToggleTagSelection = viewModel::toggleTagSelection,
-                onAddNewTag = viewModel::addNewTag
+                onAddNewTag = viewModel::addNewTag,
+                onSuggestTags = viewModel::suggestTags,
+                onGenerateTitle = viewModel::generateTitle
             )
         }
     }
