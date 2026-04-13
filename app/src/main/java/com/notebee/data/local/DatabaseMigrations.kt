@@ -5,12 +5,9 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 
 /**
  * Database migration from version 1 to version 2.
- * Adds tags support with Tag entity, NoteTagCrossRef junction table,
- * and maintains data integrity.
  */
 val MIGRATION_1_2 = object : Migration(1, 2) {
     override fun migrate(database: SupportSQLiteDatabase) {
-        // Create tags table
         database.execSQL(
             """
             CREATE TABLE IF NOT EXISTS tags (
@@ -19,8 +16,6 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
             )
             """.trimIndent()
         )
-
-        // Create note_tag_cross_ref junction table
         database.execSQL(
             """
             CREATE TABLE IF NOT EXISTS note_tag_cross_ref (
@@ -32,12 +27,18 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
             )
             """.trimIndent()
         )
-
-        // Create indexes for the junction table
         database.execSQL("CREATE INDEX IF NOT EXISTS index_note_tag_cross_ref_noteId ON note_tag_cross_ref(noteId)")
         database.execSQL("CREATE INDEX IF NOT EXISTS index_note_tag_cross_ref_tagId ON note_tag_cross_ref(tagId)")
-
-        // Create unique constraint for tag names
         database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_tags_name ON tags(name)")
+    }
+}
+
+/**
+ * Database migration from version 2 to version 3.
+ * Adds reminderTime column to notes table.
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE notes ADD COLUMN reminderTime INTEGER DEFAULT NULL")
     }
 }

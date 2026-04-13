@@ -10,22 +10,28 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -34,20 +40,32 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.InputChip
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.notebee.data.local.entity.Note
 import com.notebee.data.local.entity.NoteWithTags
 import com.notebee.ui.theme.PinYellow
@@ -56,6 +74,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import com.notebee.R
+
 /**
  * Main notes list screen: search bar, list of note cards, FAB to add note.
  * Pinned notes show a pin icon and are visually distinct.
@@ -127,7 +146,6 @@ fun NotesListScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(paddingValues)
                 ) {
                     EmptyState(
                         modifier = Modifier
@@ -136,6 +154,13 @@ fun NotesListScreen(
                     )
                 }
             } else {
+                val notesWithReminders = remember(state.notesWithTags) {
+                    state.notesWithTags.filter { it.note.reminderTime != null }
+                }
+                val notesWithoutReminders = remember(state.notesWithTags) {
+                    state.notesWithTags.filter { it.note.reminderTime == null }
+                }
+
                 LazyColumn(
                     contentPadding = PaddingValues(
                         start = 16.dp,
@@ -145,20 +170,39 @@ fun NotesListScreen(
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    itemsIndexed(
-                        state.notesWithTags,
-                        key = { _, noteWithTags -> noteWithTags.note.id }
-                    ) { index, noteWithTags ->
-                        AnimatedVisibility(
-                            visible = true,
-                            enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
-                            exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 4 })
-                        ) {
-                            NoteCard(
+                    if (notesWithReminders.isNotEmpty()) {
+                        item(key = "header_reminders") {
+                            SectionHeader(title = "Reminders")
+                        }
+                        itemsIndexed(
+                            notesWithReminders,
+                            key = { _, noteWithTags -> "reminder_${noteWithTags.note.id}" }
+                        ) { _, noteWithTags ->
+                            NoteCardAnimated(
                                 noteWithTags = noteWithTags,
-                                onClick = { onNoteClick(noteWithTags.note.id) },
-                                onTogglePin = { onTogglePin(noteWithTags) },
-                                onDelete = { onDeleteNote(noteWithTags) }
+                                onNoteClick = onNoteClick,
+                                onTogglePin = onTogglePin,
+                                onDeleteNote = onDeleteNote
+                            )
+                        }
+                        item { Spacer(modifier = Modifier.height(8.dp)) }
+                    }
+
+                    if (notesWithoutReminders.isNotEmpty()) {
+                        if (notesWithReminders.isNotEmpty()) {
+                            item(key = "header_others") {
+                                SectionHeader(title = "Others")
+                            }
+                        }
+                        itemsIndexed(
+                            notesWithoutReminders,
+                            key = { _, noteWithTags -> "other_${noteWithTags.note.id}" }
+                        ) { _, noteWithTags ->
+                            NoteCardAnimated(
+                                noteWithTags = noteWithTags,
+                                onNoteClick = onNoteClick,
+                                onTogglePin = onTogglePin,
+                                onDeleteNote = onDeleteNote
                             )
                         }
                     }
@@ -166,6 +210,40 @@ fun NotesListScreen(
             }
         }
     }
+    }
+}
+
+@Composable
+fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelMedium.copy(
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        ),
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(vertical = 4.dp, horizontal = 4.dp)
+    )
+}
+
+@Composable
+fun NoteCardAnimated(
+    noteWithTags: NoteWithTags,
+    onNoteClick: (Long) -> Unit,
+    onTogglePin: (NoteWithTags) -> Unit,
+    onDeleteNote: (NoteWithTags) -> Unit
+) {
+    AnimatedVisibility(
+        visible = true,
+        enter = fadeIn() + slideInVertically(initialOffsetY = { it / 4 }),
+        exit = fadeOut() + slideOutVertically(targetOffsetY = { -it / 4 })
+    ) {
+        NoteCard(
+            noteWithTags = noteWithTags,
+            onClick = { onNoteClick(noteWithTags.note.id) },
+            onTogglePin = { onTogglePin(noteWithTags) },
+            onDelete = { onDeleteNote(noteWithTags) }
+        )
     }
 }
 
@@ -178,8 +256,79 @@ fun NoteCard(
 ) {
     val note = noteWithTags.note
     val tags = noteWithTags.tags
+    var showUnlockDialog by remember { mutableStateOf(false) }
+    var passwordInput by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var isError by remember { mutableStateOf(false) }
+
+    if (showUnlockDialog) {
+        AlertDialog(
+            onDismissRequest = { 
+                showUnlockDialog = false
+                passwordInput = ""
+                isError = false
+            },
+            title = { Text("Unlock Note") },
+            text = {
+                Column {
+                    Text("Enter the password to view this note.")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = passwordInput,
+                        onValueChange = { 
+                            passwordInput = it
+                            isError = false
+                        },
+                        label = { Text("Password") },
+                        isError = isError,
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(imageVector = image, contentDescription = "Toggle password visibility")
+                            }
+                        },
+                        singleLine = true
+                    )
+                    if (isError) {
+                        Text(
+                            text = "Incorrect password",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(start = 16.dp, top = 4.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (passwordInput == note.password) {
+                        showUnlockDialog = false
+                        onClick()
+                    } else {
+                        isError = true
+                    }
+                }) {
+                    Text("Unlock")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showUnlockDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
     Card(
-        onClick = onClick,
+        onClick = {
+            if (note.password != null) {
+                showUnlockDialog = true
+            } else {
+                onClick()
+            }
+        },
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -191,13 +340,14 @@ fun NoteCard(
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
-        Box(
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Column(
-                modifier = Modifier.fillMaxWidth(0.85f)
+                modifier = Modifier.weight(1f)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -211,6 +361,14 @@ fun NoteCard(
                             modifier = Modifier.padding(end = 6.dp)
                         )
                     }
+                    if (note.password != null) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Protected",
+                            modifier = Modifier.size(18.dp).padding(end = 6.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     Text(
                         text = note.title.ifBlank { "Untitled" },
                         style = MaterialTheme.typography.titleMedium,
@@ -218,15 +376,16 @@ fun NoteCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                
                 Text(
-                    text = note.content,
+                    text = if (note.password != null) "********" else note.content,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 
                 // Tags row
-                if (tags.isNotEmpty()) {
+                if (tags.isNotEmpty() && note.password == null) {
                     LazyRow(
                         modifier = Modifier.padding(vertical = 4.dp),
                         horizontalArrangement = Arrangement.spacedBy(4.dp)
@@ -252,16 +411,29 @@ fun NoteCard(
                     }
                 }
                 
-                Text(
-                    text = formatTimestamp(note.timestamp),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = formatTimestamp(note.timestamp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 8.dp)
+                    )
+                    
+                    if (note.reminderTime != null) {
+                        Spacer(Modifier.size(8.dp))
+                        Icon(
+                            Icons.Default.Notifications,
+                            contentDescription = "Reminder set",
+                            modifier = Modifier.size(14.dp).padding(top = 8.dp),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
             }
+            
             Row(
-                modifier = Modifier.align(Alignment.CenterEnd),
-                horizontalArrangement = Arrangement.End
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onTogglePin) {
                     Icon(
@@ -318,7 +490,8 @@ fun NotesListScreenPreview() {
                 title = "Pinned Note",
                 content = "This is a pinned note content.",
                 timestamp = System.currentTimeMillis(),
-                isPinned = true
+                isPinned = true,
+                reminderTime = System.currentTimeMillis() + 100000
             ),
             Note(
                 id = 2,
@@ -337,7 +510,7 @@ fun NotesListScreenPreview() {
         )
         NotesListScreen(
             state = NotesListUiState(
-                notesWithTags = emptyList(),
+                notesWithTags = sampleNotes.map { NoteWithTags(it, emptyList()) },
                 allTags = emptyList(),
                 searchQuery = "",
                 selectedTag = null

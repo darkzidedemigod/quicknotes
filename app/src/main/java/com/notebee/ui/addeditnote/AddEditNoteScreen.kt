@@ -15,17 +15,32 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ErrorOutline
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,21 +50,32 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.rememberDatePickerState
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.notebee.data.local.entity.Tag
 import com.notebee.ui.theme.PinYellow
-import com.notebee.ui.theme.QuickNotesTheme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * Screen for creating a new note or editing an existing one.
- * Shows title and content fields, pin toggle, save and (when editing) delete.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,8 +92,111 @@ fun AddEditNoteScreen(
     onToggleTagSelection: (Tag) -> Unit,
     onAddNewTag: (String) -> Unit,
     onSuggestTags: () -> Unit,
-    onGenerateTitle: () -> Unit
+    onGenerateTitle: () -> Unit,
+    onSuggestReminder: () -> Unit,
+    onAcceptReminder: () -> Unit,
+    onClearSuggestion: () -> Unit,
+    onClearReminder: () -> Unit,
+    onClearAiError: () -> Unit = {},
+    onShowDatePicker: (Boolean) -> Unit = {},
+    onShowTimePicker: (Boolean) -> Unit = {},
+    onDateSelected: (Long?) -> Unit = {},
+    onTimeSelected: (Int, Int) -> Unit = { _, _ -> },
+    onSetPassword: (String?) -> Unit = {},
+    onShowPasswordDialog: (Boolean) -> Unit = {}
 ) {
+    if (state.showDatePicker) {
+        val datePickerState = rememberDatePickerState()
+        DatePickerDialog(
+            onDismissRequest = { onShowDatePicker(false) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDateSelected(datePickerState.selectedDateMillis)
+                }) {
+                    Text("Next")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onShowDatePicker(false) }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (state.showTimePicker) {
+        val timePickerState = rememberTimePickerState()
+        DatePickerDialog( // Reusing dialog container for simplicity
+            onDismissRequest = { onShowTimePicker(false) },
+            confirmButton = {
+                TextButton(onClick = {
+                    onTimeSelected(timePickerState.hour, timePickerState.minute)
+                }) {
+                    Text("OK")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onShowTimePicker(false) }) {
+                    Text("Cancel")
+                }
+            }
+        ) {
+            Column(
+                modifier = Modifier.padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                TimePicker(state = timePickerState)
+            }
+        }
+    }
+
+    if (state.showPasswordDialog) {
+        var passwordValue by remember { mutableStateOf(state.password ?: "") }
+        var passwordVisible by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = { onShowPasswordDialog(false) },
+            title = { Text(if (state.password == null) "Set Password" else "Change Password") },
+            text = {
+                Column {
+                    Text("Protect this note with a password.")
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = passwordValue,
+                        onValueChange = { passwordValue = it },
+                        label = { Text("Password") },
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            val image = if (passwordVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(imageVector = image, contentDescription = "Toggle password visibility")
+                            }
+                        },
+                        singleLine = true
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { onSetPassword(passwordValue.ifBlank { null }) }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onShowPasswordDialog(false) }) {
+                    Text("Cancel")
+                }
+                if (state.password != null) {
+                    TextButton(onClick = { onSetPassword(null) }) {
+                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -81,11 +210,18 @@ fun AddEditNoteScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { onShowPasswordDialog(true) }) {
+                        Icon(
+                            imageVector = if (state.password == null) Icons.Default.LockOpen else Icons.Default.Lock,
+                            contentDescription = "Security",
+                            tint = if (state.password != null) Color.Cyan else MaterialTheme.colorScheme.onPrimary
+                        )
+                    }
                     IconButton(onClick = onTogglePinned) {
                         Icon(
                             Icons.Default.PushPin,
                             contentDescription = if (state.isPinned) "Unpin" else "Pin",
-                            tint = if (state.isPinned) PinYellow else MaterialTheme.colorScheme.onSurface
+                            tint = if (state.isPinned) PinYellow else MaterialTheme.colorScheme.onPrimary
                         )
                     }
                     IconButton(onClick = onSave) {
@@ -124,6 +260,75 @@ fun AddEditNoteScreen(
                         .padding(bottom = 8.dp),
                     color = MaterialTheme.colorScheme.tertiary
                 )
+            }
+
+            // AI Error Banner
+            AnimatedVisibility(visible = state.aiError != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.errorContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.ErrorOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error
+                        )
+                        Spacer(Modifier.size(8.dp))
+                        Text(
+                            text = state.aiError ?: "AI Error",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = onClearAiError) {
+                            Icon(
+                                Icons.Default.Close,
+                                contentDescription = "Dismiss",
+                                tint = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+            }
+
+            // AI Reminder Suggestion Banner
+            AnimatedVisibility(visible = state.suggestedReminder != null) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 16.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                        Spacer(Modifier.size(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "Set reminder for: ${state.suggestedReminder}?",
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                        IconButton(onClick = onAcceptReminder) {
+                            Icon(Icons.Default.Notifications, contentDescription = "Accept")
+                        }
+                        IconButton(onClick = onClearSuggestion) {
+                            Icon(Icons.Default.Close, contentDescription = "Dismiss")
+                        }
+                    }
+                }
             }
 
             Row(
@@ -166,6 +371,71 @@ fun AddEditNoteScreen(
             )
             
             Spacer(modifier = Modifier.height(16.dp))
+
+            // Security Badge
+            if (state.password != null) {
+                AssistChip(
+                    onClick = { onShowPasswordDialog(true) },
+                    label = { Text("Password Protected") },
+                    leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
+                    trailingIcon = {
+                        IconButton(onClick = { onSetPassword(null) }, modifier = Modifier.size(18.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Remove protection")
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Reminder Display
+            if (state.reminderTime != null) {
+                val date = Date(state.reminderTime)
+                val format = SimpleDateFormat("MMM dd, yyyy HH:mm", Locale.getDefault())
+                AssistChip(
+                    onClick = { onShowDatePicker(true) },
+                    label = { Text("Reminder: ${format.format(date)}") },
+                    leadingIcon = { Icon(Icons.Default.Notifications, contentDescription = null, modifier = Modifier.size(AssistChipDefaults.IconSize)) },
+                    trailingIcon = {
+                        IconButton(onClick = onClearReminder, modifier = Modifier.size(18.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Remove reminder")
+                        }
+                    }
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onSuggestReminder,
+                        enabled = state.content.isNotBlank() && !state.isAiLoading,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Smart Reminder", style = MaterialTheme.typography.labelLarge)
+                    }
+
+                    Button(
+                        onClick = { onShowDatePicker(true) },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        ),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(Icons.Default.CalendarMonth, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.size(8.dp))
+                        Text("Set Reminder", style = MaterialTheme.typography.labelLarge)
+                    }
+                }
+                Spacer(modifier = Modifier.height(16.dp))
+            }
             
             // Tags section
             Column {
@@ -231,16 +501,9 @@ fun AddEditNoteScreen(
                             )
                         }
                     }
-                } else {
-                    Text(
-                        text = "No tags added. Tap 'Add' to organize your note.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
                 }
             }
 
-            // Tag selector modal
             if (state.showTagSelector) {
                 TagSelectorBottomSheet(
                     isVisible = state.showTagSelector,
@@ -252,32 +515,5 @@ fun AddEditNoteScreen(
                 )
             }
         }
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun AddNotePreview() {
-    QuickNotesTheme {
-        AddEditNoteScreen(
-            state = AddEditNoteUiState(
-                title = "",
-                content = "",
-                isPinned = false,
-                noteId = null
-            ),
-            onTitleChange = {},
-            onContentChange = {},
-            onTogglePinned = {},
-            onSave = {},
-            onBack = {},
-            onDelete = null,
-            onShowTagSelector = {},
-            onHideTagSelector = {},
-            onToggleTagSelection = {},
-            onAddNewTag = {},
-            onSuggestTags = {},
-            onGenerateTitle = {}
-        )
     }
 }

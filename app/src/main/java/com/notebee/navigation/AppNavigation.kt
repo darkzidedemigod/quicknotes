@@ -54,8 +54,7 @@ fun AppNavigation(
             )
         }
 
-        composable(Routes.ADD_EDIT_NOTE) {
-            val viewModel: AddEditNoteViewModel = hiltViewModel()
+        val addEditScreenContent: @Composable (AddEditNoteViewModel) -> Unit = { viewModel ->
             val state by viewModel.state.collectAsState()
             AddEditNoteScreen(
                 state = state,
@@ -64,14 +63,30 @@ fun AppNavigation(
                 onTogglePinned = viewModel::togglePinned,
                 onSave = { viewModel.saveNote { navController.popBackStack() } },
                 onBack = { navController.popBackStack() },
-                onDelete = null,
+                onDelete = if (state.noteId != null) { { viewModel.deleteNote { navController.popBackStack() } } } else null,
                 onShowTagSelector = viewModel::showTagSelector,
                 onHideTagSelector = viewModel::hideTagSelector,
                 onToggleTagSelection = viewModel::toggleTagSelection,
                 onAddNewTag = viewModel::addNewTag,
                 onSuggestTags = viewModel::suggestTags,
-                onGenerateTitle = viewModel::generateTitle
+                onGenerateTitle = viewModel::generateTitle,
+                onSuggestReminder = viewModel::suggestSmartReminder,
+                onAcceptReminder = viewModel::acceptSuggestedReminder,
+                onClearSuggestion = viewModel::clearSuggestedReminder,
+                onClearReminder = { viewModel.setReminder(null) },
+                onClearAiError = viewModel::clearAiError,
+                onShowDatePicker = viewModel::setShowDatePicker,
+                onShowTimePicker = viewModel::setShowTimePicker,
+                onDateSelected = viewModel::onDateSelected,
+                onTimeSelected = viewModel::onTimeSelected,
+                onSetPassword = viewModel::setPassword,
+                onShowPasswordDialog = viewModel::setShowPasswordDialog
             )
+        }
+
+        composable(Routes.ADD_EDIT_NOTE) {
+            val viewModel: AddEditNoteViewModel = hiltViewModel()
+            addEditScreenContent(viewModel)
         }
 
         composable(
@@ -81,24 +96,7 @@ fun AppNavigation(
             )
         ) { backStackEntry ->
             val viewModel: AddEditNoteViewModel = hiltViewModel(backStackEntry)
-            val state by viewModel.state.collectAsState()
-            AddEditNoteScreen(
-                state = state,
-                onTitleChange = viewModel::updateTitle,
-                onContentChange = viewModel::updateContent,
-                onTogglePinned = viewModel::togglePinned,
-                onSave = { viewModel.saveNote { navController.popBackStack() } },
-                onBack = { navController.popBackStack() },
-                onDelete = {
-                    viewModel.deleteNote { navController.popBackStack() }
-                },
-                onShowTagSelector = viewModel::showTagSelector,
-                onHideTagSelector = viewModel::hideTagSelector,
-                onToggleTagSelection = viewModel::toggleTagSelection,
-                onAddNewTag = viewModel::addNewTag,
-                onSuggestTags = viewModel::suggestTags,
-                onGenerateTitle = viewModel::generateTitle
-            )
+            addEditScreenContent(viewModel)
         }
     }
 }

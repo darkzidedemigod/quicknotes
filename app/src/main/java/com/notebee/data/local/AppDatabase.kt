@@ -14,7 +14,7 @@ import com.notebee.data.local.entity.NoteTagCrossRef
  */
 @Database(
     entities = [Note::class, Tag::class, NoteTagCrossRef::class], 
-    version = 2, 
+    version = 4,
     exportSchema = false,
     autoMigrations = []
 )

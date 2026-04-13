@@ -14,5 +14,7 @@ data class Note(
     val title: String,
     val content: String,
     val timestamp: Long,
-    val isPinned: Boolean = false
+    val isPinned: Boolean = false,
+    val reminderTime: Long? = null,
+    val password: String? = null
 )

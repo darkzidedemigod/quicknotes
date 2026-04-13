@@ -51,4 +51,25 @@ class AiRepository @Inject constructor(
             null
         }
     }
+
+    suspend fun suggestReminder(content: String): String? {
+        Log.d(TAG, "suggestReminder called")
+        val prompt = """
+            Analyze the following note content and suggest a natural language time for a reminder (e.g., "tomorrow at 9am", "in 2 hours", "next Friday"). 
+            If no specific time is implied, suggest a reasonable follow-up time.
+            Respond only with the suggested time string, no other text.
+            
+            Content: $content
+        """.trimIndent()
+
+        return try {
+            val response = generativeModel.generateContent(prompt)
+            val suggestion = response.text?.trim()
+            Log.d(TAG, "suggestReminder success: $suggestion")
+            suggestion
+        } catch (e: Exception) {
+            Log.e(TAG, "suggestReminder error", e)
+            null
+        }
+    }
 }

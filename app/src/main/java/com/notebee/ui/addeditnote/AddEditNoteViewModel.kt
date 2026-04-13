@@ -13,6 +13,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 
 /**
@@ -27,7 +30,15 @@ data class AddEditNoteUiState(
     val selectedTags: List<Tag> = emptyList(),
     val allTags: List<Tag> = emptyList(),
     val showTagSelector: Boolean = false,
-    val isAiLoading: Boolean = false
+    val isAiLoading: Boolean = false,
+    val aiError: String? = null,
+    val reminderTime: Long? = null,
+    val suggestedReminder: String? = null,
+    val showDatePicker: Boolean = false,
+    val showTimePicker: Boolean = false,
+    val selectedDate: Long? = null,
+    val password: String? = null,
+    val showPasswordDialog: Boolean = false
 )
 
 /**
@@ -66,7 +77,9 @@ class AddEditNoteViewModel @Inject constructor(
                             title = noteWithTags.note.title,
                             content = noteWithTags.note.content,
                             isPinned = noteWithTags.note.isPinned,
-                            selectedTags = noteWithTags.tags
+                            selectedTags = noteWithTags.tags,
+                            reminderTime = noteWithTags.note.reminderTime,
+                            password = noteWithTags.note.password
                         )
                     }
                 }
@@ -84,6 +97,82 @@ class AddEditNoteViewModel @Inject constructor(
 
     fun togglePinned() {
         _state.update { it.copy(isPinned = !it.isPinned) }
+    }
+
+    fun setReminder(time: Long?) {
+        _state.update { it.copy(reminderTime = time) }
+    }
+
+    fun setPassword(password: String?) {
+        _state.update { it.copy(password = password, showPasswordDialog = false) }
+    }
+
+    fun setShowPasswordDialog(show: Boolean) {
+        _state.update { it.copy(showPasswordDialog = show) }
+    }
+
+    fun setShowDatePicker(show: Boolean) {
+        _state.update { it.copy(showDatePicker = show) }
+    }
+
+    fun setShowTimePicker(show: Boolean) {
+        _state.update { it.copy(showTimePicker = show) }
+    }
+
+    fun onDateSelected(dateMillis: Long?) {
+        _state.update { it.copy(selectedDate = dateMillis, showDatePicker = false, showTimePicker = true) }
+    }
+
+    fun onTimeSelected(hour: Int, minute: Int) {
+        val selectedDate = _state.value.selectedDate ?: System.currentTimeMillis()
+        val calendar = Calendar.getInstance().apply {
+            timeInMillis = selectedDate
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        setReminder(calendar.timeInMillis)
+        _state.update { it.copy(showTimePicker = false, selectedDate = null) }
+    }
+
+    fun suggestSmartReminder() {
+        val currentContent = _state.value.content
+        if (currentContent.isBlank()) return
+
+        viewModelScope.launch {
+            _state.update { it.copy(isAiLoading = true, aiError = null) }
+            try {
+                val suggestion = aiRepository.suggestReminder(currentContent)
+                if (suggestion != null) {
+                    _state.update { it.copy(suggestedReminder = suggestion) }
+                } else {
+                    _state.update { it.copy(aiError = "Failed to suggest reminder") }
+                }
+            } catch (e: Exception) {
+                _state.update { it.copy(aiError = "Error: ${e.message}") }
+            } finally {
+                _state.update { it.copy(isAiLoading = false) }
+            }
+        }
+    }
+
+    fun acceptSuggestedReminder() {
+        val suggestion = _state.value.suggestedReminder ?: return
+        // Basic parsing for demonstration. Real app would use a natural language library.
+        val calendar = Calendar.getInstance()
+        when {
+            suggestion.contains("tomorrow", ignoreCase = true) -> calendar.add(Calendar.DAY_OF_YEAR, 1)
+            suggestion.contains("hour", ignoreCase = true) -> calendar.add(Calendar.HOUR_OF_DAY, 1)
+            suggestion.contains("week", ignoreCase = true) -> calendar.add(Calendar.WEEK_OF_YEAR, 1)
+            else -> calendar.add(Calendar.DAY_OF_YEAR, 1) // Default to tomorrow
+        }
+        setReminder(calendar.timeInMillis)
+        _state.update { it.copy(suggestedReminder = null) }
+    }
+
+    fun clearSuggestedReminder() {
+        _state.update { it.copy(suggestedReminder = null) }
     }
 
     fun showTagSelector() {
@@ -126,15 +215,20 @@ class AddEditNoteViewModel @Inject constructor(
         if (currentContent.isBlank()) return
 
         viewModelScope.launch {
-            _state.update { it.copy(isAiLoading = true) }
+            _state.update { it.copy(isAiLoading = true, aiError = null) }
             try {
                 val suggestedTagNames = aiRepository.suggestTags(currentTitle, currentContent)
-                val newTags = suggestedTagNames.map { repository.getOrCreateTag(it) }
-                
-                _state.update { currentState ->
-                    val updatedSelected = (currentState.selectedTags + newTags).distinctBy { it.id }
-                    currentState.copy(selectedTags = updatedSelected)
+                if (suggestedTagNames.isNotEmpty()) {
+                    val newTags = suggestedTagNames.map { repository.getOrCreateTag(it) }
+                    _state.update { currentState ->
+                        val updatedSelected = (currentState.selectedTags + newTags).distinctBy { it.id }
+                        currentState.copy(selectedTags = updatedSelected)
+                    }
+                } else {
+                    _state.update { it.copy(aiError = "No tags suggested") }
                 }
+            } catch (e: Exception) {
+                _state.update { it.copy(aiError = "Error: ${e.message}") }
             } finally {
                 _state.update { it.copy(isAiLoading = false) }
             }
@@ -146,16 +240,24 @@ class AddEditNoteViewModel @Inject constructor(
         if (currentContent.isBlank()) return
 
         viewModelScope.launch {
-            _state.update { it.copy(isAiLoading = true) }
+            _state.update { it.copy(isAiLoading = true, aiError = null) }
             try {
                 val generatedTitle = aiRepository.generateTitle(currentContent)
                 if (!generatedTitle.isNullOrBlank()) {
                     _state.update { it.copy(title = generatedTitle) }
+                } else {
+                    _state.update { it.copy(aiError = "Failed to generate title") }
                 }
+            } catch (e: Exception) {
+                _state.update { it.copy(aiError = "Error: ${e.message}") }
             } finally {
                 _state.update { it.copy(isAiLoading = false) }
             }
         }
+    }
+
+    fun clearAiError() {
+        _state.update { it.copy(aiError = null) }
     }
 
     fun deleteNote(onDeleted: () -> Unit) {
@@ -181,7 +283,9 @@ class AddEditNoteViewModel @Inject constructor(
                     title = current.title.ifBlank { "Untitled" },
                     content = current.content,
                     timestamp = System.currentTimeMillis(),
-                    isPinned = current.isPinned
+                    isPinned = current.isPinned,
+                    reminderTime = current.reminderTime,
+                    password = current.password
                 )
                 
                 val savedId = repository.saveNoteWithTags(note, current.selectedTags.map { it.name })
