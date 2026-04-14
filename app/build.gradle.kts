@@ -6,6 +6,8 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.dagger.hilt.android")
     id("com.google.devtools.ksp")
+    // id("com.google.gms.google-services")
+    // id("com.google.firebase.crashlytics")
 }
 
 android {
@@ -16,8 +18,8 @@ android {
         applicationId = "com.notebee"
         minSdk = 24
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.3"
+        versionCode = 6
+        versionName = "1.4"
 
         val localProperties = Properties()
         val localPropertiesFile = rootProject.file("local.properties")
@@ -82,6 +84,11 @@ dependencies {
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     implementation("com.google.ai.client.generativeai:generativeai:0.9.0")
+
+    // Firebase (Commented out until google-services.json is provided)
+    // implementation(platform("com.google.firebase:firebase-bom:33.9.0"))
+    // implementation("com.google.firebase:firebase-crashlytics")
+    // implementation("com.google.firebase:firebase-analytics")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")

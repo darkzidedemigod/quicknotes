@@ -80,7 +80,8 @@ fun AppNavigation(
                 onDateSelected = viewModel::onDateSelected,
                 onTimeSelected = viewModel::onTimeSelected,
                 onSetPassword = viewModel::setPassword,
-                onShowPasswordDialog = viewModel::setShowPasswordDialog
+                onShowPasswordDialog = viewModel::setShowPasswordDialog,
+                onSpeechResult = viewModel::appendContent
             )
         }
 

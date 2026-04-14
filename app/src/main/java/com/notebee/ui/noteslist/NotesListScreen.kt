@@ -424,7 +424,7 @@ fun NoteCard(
                         Icon(
                             Icons.Default.Notifications,
                             contentDescription = "Reminder set",
-                            modifier = Modifier.size(14.dp).padding(top = 8.dp),
+                            modifier = Modifier.size(18.dp).padding(top = 8.dp),
                             tint = MaterialTheme.colorScheme.primary
                         )
                     }

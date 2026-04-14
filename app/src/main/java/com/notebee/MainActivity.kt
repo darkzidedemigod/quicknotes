@@ -2,6 +2,7 @@ package com.notebee
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,8 +17,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.notebee.navigation.AppNavigation
+import com.notebee.ui.theme.NoteBeePrimary
 import com.notebee.ui.theme.QuickNotesTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -32,7 +35,15 @@ class MainActivity : ComponentActivity() {
         installSplashScreen()
 
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+
+        // Disable default edge-to-edge as we'll handle status bar in QuickNotesTheme
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(
+                NoteBeePrimary.toArgb(),
+                NoteBeePrimary.toArgb()
+            )
+        )
+
         setContent {
             QuickNotesTheme {
                 var showUpdateDialog by remember { mutableStateOf(false) }

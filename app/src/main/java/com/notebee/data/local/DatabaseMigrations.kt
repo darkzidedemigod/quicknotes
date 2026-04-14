@@ -42,3 +42,13 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         database.execSQL("ALTER TABLE notes ADD COLUMN reminderTime INTEGER DEFAULT NULL")
     }
 }
+
+/**
+ * Database migration from version 3 to version 4.
+ * Adds password column to notes table.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(database: SupportSQLiteDatabase) {
+        database.execSQL("ALTER TABLE notes ADD COLUMN password TEXT DEFAULT NULL")
+    }
+}

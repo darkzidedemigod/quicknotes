@@ -38,7 +38,8 @@ data class AddEditNoteUiState(
     val showTimePicker: Boolean = false,
     val selectedDate: Long? = null,
     val password: String? = null,
-    val showPasswordDialog: Boolean = false
+    val showPasswordDialog: Boolean = false,
+    val isListening: Boolean = false
 )
 
 /**
@@ -294,6 +295,18 @@ class AddEditNoteViewModel @Inject constructor(
             } finally {
                 _state.update { it.copy(isSaving = false) }
             }
+        }
+    }
+
+    fun setListening(isListening: Boolean) {
+        _state.update { it.copy(isListening = isListening) }
+    }
+
+    fun appendContent(text: String) {
+        _state.update {
+            val currentContent = it.content
+            val newContent = if (currentContent.isBlank()) text else "$currentContent $text"
+            it.copy(content = newContent)
         }
     }
 }

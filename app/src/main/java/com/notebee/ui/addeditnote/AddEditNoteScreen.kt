@@ -1,5 +1,9 @@
 package com.notebee.ui.addeditnote
 
+import android.content.Intent
+import android.speech.RecognizerIntent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -27,6 +31,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ErrorOutline
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Save
@@ -48,6 +53,7 @@ import androidx.compose.material3.InputChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -64,10 +70,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.notebee.R
 import com.notebee.data.local.entity.Tag
 import com.notebee.ui.theme.PinYellow
 import java.text.SimpleDateFormat
@@ -103,8 +112,30 @@ fun AddEditNoteScreen(
     onDateSelected: (Long?) -> Unit = {},
     onTimeSelected: (Int, Int) -> Unit = { _, _ -> },
     onSetPassword: (String?) -> Unit = {},
-    onShowPasswordDialog: (Boolean) -> Unit = {}
+    onShowPasswordDialog: (Boolean) -> Unit = {},
+    onSpeechResult: (String) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val speechRecognizerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult(),
+        onResult = { result ->
+            val data = result.data
+            val results = data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!results.isNullOrEmpty()) {
+                onSpeechResult(results[0])
+            }
+        }
+    )
+
+    fun startSpeechToText() {
+        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak now...")
+        }
+        speechRecognizerLauncher.launch(intent)
+    }
+
     if (state.showDatePicker) {
         val datePickerState = rememberDatePickerState()
         DatePickerDialog(
@@ -113,12 +144,12 @@ fun AddEditNoteScreen(
                 TextButton(onClick = {
                     onDateSelected(datePickerState.selectedDateMillis)
                 }) {
-                    Text("Next")
+                    Text("Next", color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { onShowDatePicker(false) }) {
-                    Text("Cancel")
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         ) {
@@ -134,12 +165,12 @@ fun AddEditNoteScreen(
                 TextButton(onClick = {
                     onTimeSelected(timePickerState.hour, timePickerState.minute)
                 }) {
-                    Text("OK")
+                    Text("OK", color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { onShowTimePicker(false) }) {
-                    Text("Cancel")
+                    Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         ) {
@@ -175,22 +206,28 @@ fun AddEditNoteScreen(
                                 Icon(imageVector = image, contentDescription = "Toggle password visibility")
                             }
                         },
-                        singleLine = true
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary
+                        )
                     )
                 }
             },
             confirmButton = {
                 TextButton(onClick = { onSetPassword(passwordValue.ifBlank { null }) }) {
-                    Text("Save")
+                    Text("Save", color = MaterialTheme.colorScheme.primary)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { onShowPasswordDialog(false) }) {
-                    Text("Cancel")
-                }
-                if (state.password != null) {
-                    TextButton(onClick = { onSetPassword(null) }) {
-                        Text("Remove", color = MaterialTheme.colorScheme.error)
+                Row {
+                    if (state.password != null) {
+                        TextButton(onClick = { onSetPassword(null) }) {
+                            Text("Remove", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                    TextButton(onClick = { onShowPasswordDialog(false) }) {
+                        Text("Cancel", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -210,22 +247,29 @@ fun AddEditNoteScreen(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { startSpeechToText() }) {
+                        Icon(
+                            imageVector = Icons.Default.Mic,
+                            contentDescription = "Speech to text",
+                            tint = colorResource(R.color.black)
+                        )
+                    }
                     IconButton(onClick = { onShowPasswordDialog(true) }) {
                         Icon(
                             imageVector = if (state.password == null) Icons.Default.LockOpen else Icons.Default.Lock,
                             contentDescription = "Security",
-                            tint = if (state.password != null) Color.Cyan else MaterialTheme.colorScheme.onPrimary
+                            tint = if (state.password != null) Color.Cyan else colorResource(R.color.black)
                         )
                     }
                     IconButton(onClick = onTogglePinned) {
                         Icon(
                             Icons.Default.PushPin,
                             contentDescription = if (state.isPinned) "Unpin" else "Pin",
-                            tint = if (state.isPinned) PinYellow else MaterialTheme.colorScheme.onPrimary
+                            tint = if (state.isPinned) PinYellow else colorResource(R.color.black)
                         )
                     }
                     IconButton(onClick = onSave) {
-                        Icon(Icons.Default.Save, contentDescription = "Save")
+                        Icon(Icons.Default.Save, contentDescription = "Save", tint = colorResource(R.color.black))
                     }
                     if (onDelete != null) {
                         IconButton(onClick = onDelete) {
@@ -238,10 +282,10 @@ fun AddEditNoteScreen(
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.primary,
-                    titleContentColor = MaterialTheme.colorScheme.onPrimary,
-                    navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-                    actionIconContentColor = MaterialTheme.colorScheme.onPrimary
+                    containerColor = colorResource(R.color.primary),
+                    titleContentColor = colorResource(R.color.black),
+                    navigationIconContentColor = colorResource(R.color.black),
+                    actionIconContentColor = colorResource(R.color.black)
                 )
             )
         }
@@ -258,7 +302,7 @@ fun AddEditNoteScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp),
-                    color = MaterialTheme.colorScheme.tertiary
+                    color = MaterialTheme.colorScheme.primary
                 )
             }
 
@@ -306,26 +350,27 @@ fun AddEditNoteScreen(
                         .fillMaxWidth()
                         .padding(bottom = 16.dp),
                     colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer
                     )
                 ) {
                     Row(
                         modifier = Modifier.padding(12.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.AutoAwesome, contentDescription = null)
+                        Icon(Icons.Default.AutoAwesome, contentDescription = null, tint = MaterialTheme.colorScheme.onSecondaryContainer)
                         Spacer(Modifier.size(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 "Set reminder for: ${state.suggestedReminder}?",
-                                style = MaterialTheme.typography.bodyMedium
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                         }
                         IconButton(onClick = onAcceptReminder) {
-                            Icon(Icons.Default.Notifications, contentDescription = "Accept")
+                            Icon(Icons.Default.Notifications, contentDescription = "Accept", tint = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
                         IconButton(onClick = onClearSuggestion) {
-                            Icon(Icons.Default.Close, contentDescription = "Dismiss")
+                            Icon(Icons.Default.Close, contentDescription = "Dismiss", tint = MaterialTheme.colorScheme.onSecondaryContainer)
                         }
                     }
                 }
@@ -342,7 +387,11 @@ fun AddEditNoteScreen(
                     label = { Text("Title") },
                     placeholder = { Text("Note title") },
                     singleLine = true,
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary
+                    )
                 )
                 
                 IconButton(
@@ -352,7 +401,7 @@ fun AddEditNoteScreen(
                     Icon(
                         Icons.Default.AutoAwesome,
                         contentDescription = "Generate Title",
-                        tint = if (state.content.isNotBlank()) MaterialTheme.colorScheme.tertiary else Color.Gray
+                        tint = if (state.content.isNotBlank()) MaterialTheme.colorScheme.primary else Color.Gray
                     )
                 }
             }
@@ -367,7 +416,11 @@ fun AddEditNoteScreen(
                 label = { Text("Content") },
                 placeholder = { Text("Write your note...") },
                 minLines = 8,
-                shape = RoundedCornerShape(12.dp)
+                shape = RoundedCornerShape(12.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = MaterialTheme.colorScheme.primary,
+                    focusedLabelColor = MaterialTheme.colorScheme.primary
+                )
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -382,7 +435,11 @@ fun AddEditNoteScreen(
                         IconButton(onClick = { onSetPassword(null) }, modifier = Modifier.size(18.dp)) {
                             Icon(Icons.Default.Close, contentDescription = "Remove protection")
                         }
-                    }
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        labelColor = MaterialTheme.colorScheme.primary,
+                        leadingIconContentColor = MaterialTheme.colorScheme.primary
+                    )
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             }
@@ -399,7 +456,11 @@ fun AddEditNoteScreen(
                         IconButton(onClick = onClearReminder, modifier = Modifier.size(18.dp)) {
                             Icon(Icons.Default.Close, contentDescription = "Remove reminder")
                         }
-                    }
+                    },
+                    colors = AssistChipDefaults.assistChipColors(
+                        labelColor = MaterialTheme.colorScheme.primary,
+                        leadingIconContentColor = MaterialTheme.colorScheme.primary
+                    )
                 )
                 Spacer(modifier = Modifier.height(16.dp))
             } else {
@@ -454,8 +515,8 @@ fun AddEditNoteScreen(
                             onClick = onSuggestTags,
                             enabled = state.content.isNotBlank() && !state.isAiLoading,
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.tertiaryContainer,
-                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
                             modifier = Modifier.height(32.dp)
                         ) {
@@ -470,7 +531,11 @@ fun AddEditNoteScreen(
 
                         Button(
                             onClick = onShowTagSelector,
-                            modifier = Modifier.height(32.dp)
+                            modifier = Modifier.height(32.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            )
                         ) {
                             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.padding(horizontal = 2.dp))

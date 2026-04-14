@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.notebee.data.local.AppDatabase
 import com.notebee.data.local.MIGRATION_1_2
 import com.notebee.data.local.MIGRATION_2_3
+import com.notebee.data.local.MIGRATION_3_4
 import com.notebee.data.local.dao.NoteDao
 import com.notebee.data.local.dao.TagDao
 import dagger.Module
@@ -30,7 +31,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "quick_notes_db"
         )
-        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
         .build()
     }
 
